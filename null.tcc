@@ -2,6 +2,8 @@
 #include "clp.h"
 #include "mpfd.hh"
 #include <netdb.h>
+#include <time.h> 
+#include <stdio.h>
 
 static bool quiet = false;
 tamed void handle_client(tamer::fd cfd);
@@ -53,6 +55,8 @@ tamed void client(int num_msg) {
     const char* hostname = "localhost";
     int port = 1234;
     struct hostent* hp = gethostbyname(hostname);
+    clock_t t;
+    double diff;
   }
 
   // lookup hostname address
@@ -73,13 +77,19 @@ tamed void client(int num_msg) {
   mpfd.initialize(cfd);
 
   // pingpong 10 times
+
+  t = clock();
+twait { 
   for (i = 0; i != num_msg && cfd; ++i) {
     req = Json::array(1, i);
-    twait { mpfd.call(req, make_event(res)); }
+    mpfd.call(req, make_event(res)); 
     if (!quiet)
       std::cout << "call " << req << ": " << res << std::endl;
   }
+}
 
+  t = clock() - t;
+  printf ("%lf\n",((double)t)/CLOCKS_PER_SEC);
   // close out
   cfd.close();
 }
