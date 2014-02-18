@@ -25,3 +25,6 @@ $(DEPSDIR)/%.cc: %.tcc config.h $(DEPSDIR)/stamp $(TAMER)
 
 all: null.o
 	$(CXX) $(CFLAGS) -o nulltest $^ $(LDFLAGS) $(LIBS)
+
+paxos: paxos.o
+	$(CXX) $(CFLAGS) -o paxos $^ $(LDFLAGS) $(LIBS)
