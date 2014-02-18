@@ -79,7 +79,7 @@ tamed void client(int num_msg) {
   // pingpong 10 times
 
   t = clock();
-twait { 
+  twait { 
   for (i = 0; i != num_msg && cfd; ++i) {
     req = Json::array(1, i);
     mpfd.call(req, make_event(res)); 
