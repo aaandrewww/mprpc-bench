@@ -95,14 +95,13 @@ tamed void client(int num_msg, int msg_size) {
     mpfd.call(req[i], tamer::make_event(r, i, res[i]));
   }
 
-  t = clock() - t;
-  printf ("%lf\n",((double)t)/CLOCKS_PER_SEC);
-
   while (r.has_events()) {
     twait(r, i);
     if (!quiet)
       std::cout << "call " << req[i] << ": " << res[i] << std::endl;
   }
+  t = clock() - t;
+  printf ("%lf\n",((double)t)/CLOCKS_PER_SEC);
 
   // close out
   cfd.close();
