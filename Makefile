@@ -34,3 +34,6 @@ message-size: message-size.o
 
 windowed-message-size: windowed-message-size.o
 	$(CXX) $(CFLAGS) -o windowed-message-size $^ $(LDFLAGS) $(LIBS)
+
+multi-client: multi-client.o
+	$(CXX) $(CFLAGS) -o multi-client $^ $(LDFLAGS) $(LIBS)

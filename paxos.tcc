@@ -8,8 +8,7 @@
 #include <algorithm>    // std::max
 #include <vector>       // std::vector
 
-static bool quiet = false;
-tamed void handle_client(tamer::fd cfd);
+
 
 /*
  * An RPC message is a JSON Array [procedure, id, args ...]
@@ -48,6 +47,8 @@ static tamer::fd cfd;
  * Declarations
  */
 
+static bool quiet = false;
+static bool debug = false;
 tamed void setup_connection(const char* hostname, uint64_t port);
 uint64_t choose_value();
 
@@ -86,17 +87,16 @@ tamed void acceptor(const char* hostname, uint64_t port) {
     Json req, res = Json::make_array();
   }
 
-  if (sfd)
-    std::cerr << "listening on port " << port << std::endl;
-  else
+  if (sfd) {
+    if (!quiet) {
+      std::cerr << "listening on port " << port << std::endl;
+    }
+  } else
     std::cerr << "listen: " << strerror(-sfd.error()) << std::endl;
   while (sfd) { 
-    std::cerr << "waiting on accept" << std::endl;
     twait { sfd.accept(make_event(cfd)); }
-    std::cerr << "after twait" << std::endl;
     handle_proposer(cfd);
   }
-  std::cerr << "exiting acceptor" << std::endl;
 }
 
 tamed void handle_proposer(tamer::fd cfd) {
@@ -107,11 +107,13 @@ tamed void handle_proposer(tamer::fd cfd) {
 
   while (cfd) {
     twait { mpfd.read_request(tamer::make_event(req)); }
-    std::cerr << "got message " << req << std::endl;
-    std::cerr << "n_p=" << n_p << std::endl;
-    std::cerr << "n_l=" << n_l << std::endl;
-    std::cerr << "n_a=" << n_a << std::endl;
-    std::cerr << "v_a=" << v_a << std::endl;
+    if (debug) {
+      std::cerr << "got message " << req << std::endl;
+      std::cerr << "n_p=" << n_p << std::endl;
+      std::cerr << "n_l=" << n_l << std::endl;
+      std::cerr << "n_a=" << n_a << std::endl;
+      std::cerr << "v_a=" << v_a << std::endl;
+    }
     if (!req || !req.is_a() || req.size() < 2) {
       if (req)
 	std::cerr << "bad RPC: " << req << std::endl;
@@ -138,11 +140,14 @@ tamed void handle_proposer(tamer::fd cfd) {
       std::cerr << "bad RPC procedure id: " << req[0].as_i() << std::endl;
       break;
     }
-    std::cerr << "response " << res << std::endl;
-    std::cerr << "n_p=" << n_p << std::endl;
-    std::cerr << "n_l=" << n_l << std::endl;
-    std::cerr << "n_a=" << n_a << std::endl;
-    std::cerr << "v_a=" << v_a << std::endl;
+
+    if (debug) {
+      std::cerr << "response " << res << std::endl;
+      std::cerr << "n_p=" << n_p << std::endl;
+      std::cerr << "n_l=" << n_l << std::endl;
+      std::cerr << "n_a=" << n_a << std::endl;
+      std::cerr << "v_a=" << v_a << std::endl;
+    }
     req = Json();
     mpfd.write(res);
   }
@@ -180,7 +185,7 @@ void handle_decided(uint64_t v) {
  * Proposer code
  */
 
-tamed void proposer(const char* hostname, uint64_t port, uint64_t f) {
+tamed void proposer(const char* hostname, uint64_t port, uint64_t f, uint64_t iterations) {
   tvars {
     tamer::fd cfd;
     msgpack_fd* mpfd;
@@ -220,8 +225,21 @@ tamed void proposer(const char* hostname, uint64_t port, uint64_t f) {
     mpfds.push_back(mpfd);
   }
 
-  twait {
-    propose(mpfds, f, tamer::make_event());
+  for (i=0; i != iterations; ++i){
+    n_p = 0;
+    n_l = 0;
+    n_a = 0;
+    v_a = 0;
+    a = 0;
+    n_o = 0;
+    v_o = 0;
+    message_counter = 0;
+    if (!quiet)
+      std::cout << "iteration " << i << std::endl;
+      
+    twait {
+      propose(mpfds, f, tamer::make_event());
+    }
   }
 
   /* clean up tamer fds */
@@ -243,18 +261,20 @@ tamed void send_prepare(std::vector<msgpack_fd*> mpfds, uint64_t f, tamer::event
     Json* res;
     tamer::rendezvous<uint64_t> r;
     uint64_t j;
+    int k = 0;
   }
   res = new Json[f+1];
 
   for (uint64_t i = 0; i != f+1; ++i) {
     req = Json::array(1, ++message_counter, n_p);
     mpfds[i]->call(req, tamer::make_event(r, /* the tamer::rendezvous */
-                                                i, /* the event id */
-                                                res[i] /* where to return the value to */
-                                                ));
+                                          i, /* the event id */
+                                          res[i] /* where to return the value to */
+                                          ));
   }
 
-  while (r.has_waiting()) {
+  
+  while (r.has_waiting() || r.has_ready()) {
     twait(r, j);
     recv_prepared(res[j][2].as_i(), res[j][3].as_i(), mpfds, f, done);
   }
@@ -265,7 +285,8 @@ tamed void recv_prepared(uint64_t n,
                          std::vector<msgpack_fd*> mpfds,
                          uint64_t f,
                          tamer::event<> done) {
-  std::cerr << "got prepared " << n << " " << v << std::endl;
+  if(debug) {
+    std::cerr << "got prepared " << n << " " << v << std::endl;
     std::cerr << "n_p=" << n_p << std::endl;
     std::cerr << "n_l=" << n_l << std::endl;
     std::cerr << "n_a=" << n_a << std::endl;
@@ -273,6 +294,7 @@ tamed void recv_prepared(uint64_t n,
     std::cerr << "a=" << a << std::endl;
     std::cerr << "n_o=" << n_o << std::endl;
     std::cerr << "v_o=" << v_o << std::endl;
+  }
   if (n > n_o) {
     n_o = n;
     v_o = v;
@@ -307,7 +329,7 @@ tamed void send_accept(std::vector<msgpack_fd*> mpfds,
                                                 ));
   }
 
-  while (r.has_waiting() != 0) {
+  while (r.has_waiting() || r.has_ready()) {
     twait(r, j);
     recv_accepted(res[j][2].as_i(), mpfds, f, done);
   }
@@ -317,6 +339,7 @@ tamed void recv_accepted(uint64_t n,
                          std::vector<msgpack_fd*> mpfds,
                          uint64_t f,
                          tamer::event<> done) {
+  if(debug) {
     std::cerr << "got accepted " << n << std::endl;
     std::cerr << "n_p=" << n_p << std::endl;
     std::cerr << "n_l=" << n_l << std::endl;
@@ -325,11 +348,11 @@ tamed void recv_accepted(uint64_t n,
     std::cerr << "a=" << a << std::endl;
     std::cerr << "n_o=" << n_o << std::endl;
     std::cerr << "v_o=" << v_o << std::endl;
+  }
   if (n == n_p) {
     a = a + 1;
   }
   if (a == f+1) {
-    std::cerr << "send decided" << std::endl;
     send_decided(mpfds, f, done);
   }
 }
@@ -366,6 +389,7 @@ static Clp_Option options[] = {
   { "port", 'p', 0, Clp_ValInt, 0 },
   { "hostname", 'h', 0, Clp_ValStringNotOption, 0 },
   { "failures", 'f', 0, Clp_ValInt, 0 },
+  { "iterations", 'i', 0, Clp_ValInt, 0 },
   { "quiet", 'q', 0, 0, Clp_Negate }
 };
 
@@ -376,6 +400,7 @@ int main(int argc, char** argv) {
   const char* hostname = "localhost";
   uint64_t port = 1234;
   uint64_t f = 0;
+  uint64_t iterations = 2;
   Clp_Parser* clp = Clp_NewParser(argc, argv, sizeof(options) / sizeof(options[0]), options);
 
   while (Clp_Next(clp) != Clp_Done) {
@@ -391,6 +416,8 @@ int main(int argc, char** argv) {
       port = clp->val.i;
     else if (Clp_IsLong(clp, "failures"))
       f = clp->val.i;
+    else if (Clp_IsLong(clp, "iterations"))
+      iterations = clp->val.i;
   }
 
   if(f<=0) {
@@ -401,7 +428,7 @@ int main(int argc, char** argv) {
   if (is_acceptor)
     acceptor(hostname, port);
   else
-    proposer(hostname, port, f);
+    proposer(hostname, port, f, iterations);
 
   tamer::loop();
   tamer::cleanup();
