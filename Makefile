@@ -28,3 +28,6 @@ all: null.o
 
 paxos: paxos.o
 	$(CXX) $(CFLAGS) -o paxos $^ $(LDFLAGS) $(LIBS)
+
+message-size: message-size.o
+	$(CXX) $(CFLAGS) -o message-size $^ $(LDFLAGS) $(LIBS)
