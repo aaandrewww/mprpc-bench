@@ -31,3 +31,6 @@ paxos: paxos.o
 
 message-size: message-size.o
 	$(CXX) $(CFLAGS) -o message-size $^ $(LDFLAGS) $(LIBS)
+
+windowed-message-size: windowed-message-size.o
+	$(CXX) $(CFLAGS) -o windowed-message-size $^ $(LDFLAGS) $(LIBS)
